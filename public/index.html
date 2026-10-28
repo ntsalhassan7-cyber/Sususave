@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Susu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Manrope:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="shared/base.css">
+<link rel="stylesheet" href="admin/app.css">
+<link rel="stylesheet" href="user/app.css">
+<link rel="stylesheet" href="login/app.css">
+</head><body>
+<div id="app"></div>
+<script>window.SUSU_ENTRY='root';</script>
+<script src="shared/logic.js"></script>
+<script src="shared/core.js"></script>
+<script src="login/app.js"></script>
+<script src="admin/app.js"></script>
+<script src="user/app.js"></script>
+<script>
+/* One link, three apps. The route guard in shared/core.js sends #admin... to the admin app,
+   #home, #schedule and #payments to the member app, and everything else to the login page,
+   and only lets you into an app you are signed in for. */
+Susu.startRouter(document.getElementById('app'),{login:window.SusuLogin,admin:window.SusuAdmin,user:window.SusuUser});
+</script>
+</body></html>

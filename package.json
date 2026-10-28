@@ -1,0 +1,23 @@
+{
+  "name": "sususave",
+  "version": "1.0.0",
+  "description": "Susu (rotating savings) groups: admin and member apps, cash records and mobile money.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node test/api.js && node test/e2e.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "bcryptjs": "^3.0.3",
+    "cookie-session": "^2.1.1",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}

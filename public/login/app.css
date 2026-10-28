@@ -1,0 +1,56 @@
+/* Susu login: a gradient panel that tells you which door you are using (leaf green for members,
+   forest green for the admin) beside one sign-in card. */
+.lg{min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)}
+@media (max-width:860px){.lg{grid-template-columns:minmax(0,1fr)}}
+.lg-side{background:var(--grad);color:var(--hero-fg);position:relative;overflow:hidden;display:flex;flex-direction:column;gap:22px;padding-block:28px;padding-left:max(28px,env(safe-area-inset-left,0px));padding-right:28px;transition:background .3s}
+@media (min-width:861px){.lg-side{position:sticky;top:0;height:100vh;padding:40px 48px;padding-left:max(48px,env(safe-area-inset-left,0px))}}
+@media (max-width:860px){.lg-side{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 26px;border-radius:0 0 32px 32px;gap:12px}}
+.lg-brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:1.1rem}
+.lg-logo{width:42px;height:42px;border-radius:50%;background:var(--hero-glass);display:grid;place-items:center;color:var(--hero-fg)}
+.lg-logo svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.lg-logo svg .d{fill:currentColor;stroke:none}
+.lg-art{flex:1;display:grid;place-items:center;min-height:0}
+.lg-art .jar{width:min(320px,80%);height:auto}
+@media (max-width:860px){.lg-art{display:none}}
+.jar .ln{fill:none;stroke:var(--hero-fg);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.jar .ln.thin{stroke-width:1.6}
+.jar .cn{fill:var(--hero-glass);stroke:var(--hero-fg);stroke-width:1.8}
+.lg-copy h1{font-family:var(--display);font-weight:800;font-size:clamp(1.6rem,3.6vw,2.6rem);line-height:1.1;letter-spacing:-.025em;text-wrap:balance;overflow-wrap:anywhere}
+.lg-copy p{margin-top:10px;color:var(--hero-muted);max-width:44ch}
+.lg-side .kente{width:160px;opacity:.8}
+.lg-side::before,.lg-side::after{content:"";position:absolute;border-radius:50%;border:48px solid var(--hero-ring);pointer-events:none}
+.lg-side::before{width:520px;height:520px;right:-180px;top:-200px}
+.lg-side::after{width:320px;height:320px;right:-60px;top:-90px;border-width:34px}
+.lg-side > *{position:relative}
+@media (max-width:860px){.lg-side .kente{display:none}}
+
+.lg-main{display:grid;place-items:center;padding-block:32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.lg-card{width:100%;max-width:480px;background:var(--surface);border:1px solid var(--line);border-radius:30px;padding:26px;box-shadow:var(--shadow);display:grid;gap:4px}
+@media (max-width:420px){.lg-card{padding:20px}}
+.role{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--sunk);border-radius:99px;padding:5px;margin-bottom:18px}
+.role button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border:0;border-radius:99px;background:transparent;color:var(--muted);font-weight:600;font-size:.9rem;cursor:pointer}
+.role button:hover{color:var(--fg)}
+.role button[aria-selected="true"]{background:var(--surface);color:var(--accent-deep);box-shadow:var(--shadow)}
+.lg h2{font-family:var(--display);font-weight:800;font-size:1.55rem;line-height:1.2;letter-spacing:-.02em;text-wrap:balance}
+.lg h2:focus{outline:none}
+.lg .sub{color:var(--muted);margin-top:6px;font-size:.92rem}
+.lg-card input[type=text],.lg-card input[type=password]{min-height:3.3rem;border-radius:16px;margin-top:16px;font-size:1.02rem}
+.lg-card .pwrow .btn{margin-top:16px;min-height:3.3rem}
+.lg-card .err{margin-top:10px}
+.btn.big{min-height:3.3rem;font-size:1rem;margin-top:6px}
+.center{text-align:center}
+.lg-card .hint.center{margin-top:14px}
+.lg-wait{padding-block:18px}
+.wz-top{display:flex;align-items:center;gap:12px}
+.wz-top .back{width:2.6rem;height:2.6rem;border-radius:50%;border:1.5px solid var(--line2);background:transparent;cursor:pointer;display:grid;place-items:center;flex:none}
+.wz-top .back:hover{border-color:var(--fg)}
+.wz-prog{flex:1;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.wz-prog i{height:5px;border-radius:99px;background:var(--sunk)}
+.wz-prog i.on{background:var(--accent)}
+.wz-count{font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.wz-step{margin-top:18px;font-weight:600;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.av-prev{display:grid;justify-items:center;margin:18px 0 14px}
+.note-card{border:1.5px dashed var(--line2);border-radius:20px;padding:18px;display:grid;gap:6px}
+.note-card h3{font-family:var(--display);font-weight:600;font-size:1.05rem}
+.code-in{text-transform:uppercase;letter-spacing:.2em;font-family:var(--display);font-weight:700}
+.lg-found{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:.9rem}
