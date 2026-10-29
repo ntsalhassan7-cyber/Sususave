@@ -200,10 +200,6 @@ button.tile:hover{border-color:var(--line2)}
 /* short status message, bottom of the page */
 .toast{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);padding:12px 18px;border-radius:14px;font-size:.9rem;font-weight:500;max-width:min(92vw,520px);box-shadow:0 10px 30px rgba(0,0,0,.25);transition:opacity .2s,transform .2s;z-index:50}
 .toast.show{opacity:1;transform:translate(-50%,0)}
-.momo-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px}
-.momo-row .btn svg{width:18px;height:18px;margin-right:6px}
 .actions .hint{grid-column:1/-1}
 .code-box{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .code-box b{font-family:var(--display);font-size:1.6rem;letter-spacing:.18em;padding:6px 14px;border:1.5px dashed var(--line2);border-radius:12px;background:var(--surface2)}
-.momo-row select{width:auto;flex:none}
-.momo-row input[type=tel]{flex:1}

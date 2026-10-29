@@ -89,10 +89,6 @@ async function shot(page, name) { await page.screenshot({ path: path.join(OUT, n
   await m1.goto(base + '/#payments');
   await m1.waitForFunction(() => /Paid/.test(document.querySelector('#us-pay-root').textContent), null, { timeout: 15000 });
   ok(true, 'member 1 sees payments');
-  await m1.fill('#momo-phone', '0241234567');
-  await m1.click('#momo-save');
-  await m1.waitForFunction(() => /Saved\./.test(document.getElementById('momo-status').textContent));
-  ok(true, 'member saved MoMo number');
   await shot(m1, 'user-payments');
   await m1.goto(base + '/#schedule'); await m1.waitForSelector('#us-sched-root .card'); await shot(m1, 'user-schedule');
 

@@ -1,4 +1,4 @@
-/* Susu server: accounts, groups, the schedule, cash records and mobile money.
+/* Susu server: accounts, groups, the schedule and cash records.
    Runs as a normal Node server (node src/server.js) and as a Vercel function (api/index.js). */
 'use strict';
 require('./env');
@@ -9,12 +9,10 @@ const helmet = require('helmet');
 const cookieSession = require('cookie-session');
 const bcrypt = require('bcryptjs');
 const db = require('./db');
-const paystack = require('./paystack');
 const L = require('../public/shared/logic.js');
 
 const PORT = Number(process.env.PORT) || 3000;
 const PROD = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
-const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 const SESSION_SECRET = process.env.SESSION_SECRET || (PROD ? '' : 'dev-only-secret-change-me');
 if (!SESSION_SECRET) throw new Error('Set SESSION_SECRET (any long random string) before starting in production.');
 
@@ -30,15 +28,14 @@ app.use(helmet({
       fontSrc: ["'self'", 'https://fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:'],
       connectSrc: ["'self'"],
-      formAction: ["'self'", 'https://checkout.paystack.com'],
+      formAction: ["'self'"],
       frameAncestors: ["'none'"]
     }
   },
   crossOriginEmbedderPolicy: false
 }));
 
-/* Paystack signs the raw body, so keep it for the webhook route. */
-app.use(express.json({ limit: '64kb', verify: (req, res, buf) => { req.rawBody = buf; } }));
+app.use(express.json({ limit: '64kb' }));
 app.use(cookieSession({
   name: 'susu',
   keys: [SESSION_SECRET],
@@ -67,7 +64,6 @@ async function newCode() {
 }
 const normCode = (c) => String(c || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
 const normUser = (u) => L.normUser(u);
-const okPhone = (p) => /^0\d{9}$/.test(p);
 
 /* A few failed logins in a row from one address slow the next attempts down. */
 const tries = new Map();
@@ -91,8 +87,7 @@ function settingsOf(g) {
   };
 }
 function memberOut(m) {
-  return { uid: String(m.id), fullName: m.full_name, username: m.username, avatar: m.avatar, joinedAt: m.joined_at,
-    phone: m.phone, provider: m.provider };
+  return { uid: String(m.id), fullName: m.full_name, username: m.username, avatar: m.avatar, joinedAt: m.joined_at };
 }
 async function ctx(gid) {
   const g = await db.get('SELECT * FROM groups WHERE id=?', [gid]);
@@ -131,28 +126,26 @@ async function stateFor(me) {
   const c = await ctx(me.gid);
   const pays = {}, outs = {};
   (await db.all('SELECT * FROM payments WHERE group_id=?', [me.gid])).forEach((p) => {
-    pays[p.round + '_' + p.member_id] = { r: p.round, uid: String(p.member_id), method: p.method, status: p.status,
-      amount: p.amount, at: p.paid_at || p.created_at, by: p.recorded_by, note: p.note, reference: p.reference };
+    pays[p.round + '_' + p.member_id] = { r: p.round, uid: String(p.member_id), status: p.status,
+      amount: p.amount, at: p.paid_at || p.created_at, by: p.recorded_by };
   });
   (await db.all('SELECT * FROM payouts WHERE group_id=?', [me.gid])).forEach((o) => {
-    outs[o.round] = { r: o.round, uid: String(o.member_id), method: o.method, status: o.status, amount: o.amount,
+    outs[o.round] = { r: o.round, uid: String(o.member_id), status: o.status, amount: o.amount,
       at: o.paid_at || o.created_at, by: o.recorded_by };
   });
-  const mine = me.role === 'member' ? c.members.find((m) => m.uid === String(me.id)) : null;
   return {
-    me: { role: me.role, uid: String(me.id), name: me.name, phone: mine ? mine.phone : '', provider: mine ? mine.provider : '' },
+    me: { role: me.role, uid: String(me.id), name: me.name },
     group: { code: c.g.code, settings: c.st },
     members: c.members,
     payments: pays,
     payouts: outs,
-    momo: { enabled: paystack.enabled(), providers: Object.keys(paystack.PROVIDERS) },
     today: today()
   };
 }
 const sendState = async (req, res) => res.json(await stateFor(req.me || await who(req)));
 /* Not signed in is a normal answer here, not an error, so the page can show the login door. */
 app.get('/api/state', wrap(async (req, res) => { const me = await who(req); if (!me) { req.session = null; return res.json({ me: null }); } res.json(await stateFor(me)); }));
-app.get('/api/health', wrap(async (req, res) => { await db.ready(); res.json({ ok: true, momo: paystack.enabled() }); }));
+app.get('/api/health', wrap(async (req, res) => { await db.ready(); res.json({ ok: true }); }));
 
 /* ---------- accounts ---------- */
 const PW_MIN = 6, ADMIN_PW_MIN = 8;
@@ -223,15 +216,6 @@ app.post('/api/member/login', throttle, wrap(async (req, res) => {
 }));
 app.post('/api/logout', (req, res) => { req.session = null; res.json({ ok: true }); });
 
-/* Members keep their MoMo number so the admin can pay them out. */
-app.put('/api/me', signedIn, wrap(async (req, res) => {
-  if (req.me.role !== 'member') return bad(res, 403, 'Only members have a MoMo number here.');
-  const phone = String(req.body.phone || '').replace(/\s+/g, ''), provider = String(req.body.provider || '');
-  if (phone && !okPhone(phone)) return bad(res, 400, 'Type the number as 10 digits, for example 0241234567.');
-  if (phone && !paystack.PROVIDERS[provider]) return bad(res, 400, 'Choose the mobile money network.');
-  await db.run('UPDATE members SET phone=?, provider=? WHERE id=?', [phone, phone ? provider : '', req.me.id]);
-  await sendState(req, res);
-}));
 app.put('/api/me/password', signedIn, wrap(async (req, res) => {
   const cur = String(req.body.current || ''), pw = String(req.body.password || '');
   const table = req.me.role === 'admin' ? 'admins' : 'members', min = req.me.role === 'admin' ? ADMIN_PW_MIN : PW_MIN;
@@ -289,7 +273,7 @@ function mayRecord(me, c, rd) {
 
 /* ---------- cash ---------- */
 const getPay = (gid, r, uid) => db.get('SELECT * FROM payments WHERE group_id=? AND round=? AND member_id=?', [gid, r, Number(uid)]);
-const INS_PAY = 'INSERT INTO payments(group_id,round,member_id,method,status,amount,reference,recorded_by,note,created_at,paid_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)';
+const INS_PAY = 'INSERT INTO payments(group_id,round,member_id,method,status,amount,recorded_by,created_at,paid_at) VALUES (?,?,?,?,?,?,?,?,?)';
 async function recordCash(me, c, rd, uid, on) {
   const i = slotOf(c, uid);
   if (i < 0 || rd.contributors.indexOf(i) < 0) return 'That person does not pay in this round.';
@@ -297,10 +281,9 @@ async function recordCash(me, c, rd, uid, on) {
   if (on) {
     if (cur && cur.status === 'paid') return '';
     if (cur) await db.run('DELETE FROM payments WHERE id=?', [cur.id]);
-    await db.run(INS_PAY, [c.g.id, rd.r, Number(uid), 'cash', 'paid', c.st.base, null, me.role + ':' + me.name, '', now(), now()]);
+    await db.run(INS_PAY, [c.g.id, rd.r, Number(uid), 'cash', 'paid', c.st.base, me.role + ':' + me.name, now(), now()]);
   } else {
     if (!cur) return '';
-    if (cur.method === 'momo' && cur.status === 'paid') return 'That payment came in by mobile money, so it cannot be unmarked.';
     await db.run('DELETE FROM payments WHERE id=?', [cur.id]);
   }
   return '';
@@ -339,110 +322,10 @@ app.post('/api/payouts/cash', signedIn, wrap(async (req, res) => {
     await db.run('INSERT INTO payouts(group_id,round,member_id,method,status,amount,recorded_by,created_at,paid_at) VALUES (?,?,?,?,?,?,?,?,?)',
       [c.g.id, rd.r, Number(col.uid), 'cash', 'paid', rd.net, req.me.role + ':' + req.me.name, now(), now()]);
   } else if (cur) {
-    if (cur.method === 'momo' && cur.status !== 'failed') return bad(res, 409, 'That payout went by mobile money, so it cannot be undone here.');
     await db.run('DELETE FROM payouts WHERE id=?', [cur.id]);
   }
   await log(c.g.id, req.me.role + ':' + req.me.name, on ? 'payout.cash' : 'payout.cleared', { r: rd.r });
   await sendState(req, res);
-}));
-
-/* ---------- mobile money in: a member pays their own contribution ---------- */
-function siteUrl(req) { return BASE_URL || (req.protocol + '://' + req.get('host')); }
-app.post('/api/payments/momo/start', signedIn, wrap(async (req, res) => {
-  if (!paystack.enabled()) return bad(res, 503, 'Mobile money is not switched on for this Susu yet.');
-  if (req.me.role !== 'member') return bad(res, 403, 'Members pay their own contributions.');
-  const c = await ctx(req.me.gid), rd = c.st && roundFor(c, req.body.r);
-  if (!rd) return bad(res, 400, 'No such round.');
-  const i = slotOf(c, req.me.id);
-  if (i < 0 || rd.contributors.indexOf(i) < 0) return bad(res, 400, 'You do not pay in this round.');
-  const cur = await getPay(c.g.id, rd.r, req.me.id);
-  if (cur && cur.status === 'paid') return bad(res, 409, 'This round is already paid.');
-  const reference = 'susu-' + c.g.id + '-' + rd.r + '-' + req.me.id + '-' + crypto.randomBytes(4).toString('hex');
-  const m = c.members.find((x) => x.uid === String(req.me.id));
-  try {
-    const data = await paystack.initializeMomo({
-      email: m.username + '+' + c.g.code.toLowerCase() + '@susu.app',
-      amount: c.st.base, reference,
-      callbackUrl: siteUrl(req) + '/api/payments/momo/return',
-      metadata: { group: c.g.code, round: rd.r + 1, member: m.fullName, custom_fields: [{ display_name: 'Group', variable_name: 'group', value: c.g.name || c.g.code }] }
-    });
-    if (cur) await db.run('DELETE FROM payments WHERE id=?', [cur.id]);
-    await db.run(INS_PAY, [c.g.id, rd.r, req.me.id, 'momo', 'pending', c.st.base, reference, 'member:' + m.username, '', now(), null]);
-    res.json({ url: data.authorization_url, reference });
-  } catch (e) {
-    console.error('paystack initialize', e.message);
-    bad(res, 502, 'Mobile money could not start: ' + e.message);
-  }
-}));
-/* Mark a MoMo payment from what Paystack tells us (callback or webhook). */
-async function settlePayment(reference, data) {
-  const p = await db.get('SELECT * FROM payments WHERE reference=?', [reference]);
-  if (!p) return null;
-  if (p.status === 'paid') return p;
-  if (!data) { try { data = await paystack.verify(reference); } catch (e) { return p; } }
-  const ok = data.status === 'success' && data.currency === 'GHS' && Math.round(data.amount) >= Math.round(p.amount * 100);
-  const status = ok ? 'paid' : (data.status === 'failed' || data.status === 'abandoned' || data.status === 'reversed') ? 'failed' : 'pending';
-  if (status !== p.status) {
-    await db.run('UPDATE payments SET status=?, paid_at=?, note=? WHERE id=?', [status, ok ? now() : null, ok ? (data.channel || 'mobile_money') : (data.gateway_response || ''), p.id]);
-    await log(p.group_id, 'paystack', 'momo.' + status, { r: p.round, uid: p.member_id, reference });
-  }
-  return db.get('SELECT * FROM payments WHERE id=?', [p.id]);
-}
-app.get('/api/payments/momo/return', wrap(async (req, res) => {
-  const ref = String(req.query.reference || req.query.trxref || '');
-  if (ref) await settlePayment(ref);
-  res.redirect('/#payments');
-}));
-app.get('/api/payments/momo/status', signedIn, wrap(async (req, res) => {
-  const ref = String(req.query.reference || '');
-  const p = await db.get('SELECT * FROM payments WHERE reference=? AND group_id=?', [ref, req.me.gid]);
-  if (!p) return bad(res, 404, 'No such payment.');
-  const q = await settlePayment(ref);
-  res.json({ status: q.status, state: await stateFor(req.me) });
-}));
-
-/* ---------- mobile money out: the admin sends the pot to the collector ---------- */
-app.post('/api/payouts/momo', adminOnly, wrap(async (req, res) => {
-  if (!paystack.enabled()) return bad(res, 503, 'Mobile money is not switched on for this Susu yet.');
-  const c = await ctx(req.me.gid), rd = c.st && roundFor(c, req.body.r);
-  if (!rd) return bad(res, 400, 'No such round.');
-  const col = c.slots[rd.member];
-  if (!col) return bad(res, 409, 'Nobody has taken that place yet.');
-  if (!col.phone || !col.provider) return bad(res, 409, col.fullName + ' has not added a MoMo number yet. They can add it from the member app.');
-  const cur = await getOut(c.g.id, rd.r);
-  if (cur && cur.status !== 'failed') return bad(res, 409, cur.status === 'paid' ? 'This round is already paid out.' : 'A transfer for this round is already on its way.');
-  const reference = 'susu-out-' + c.g.id + '-' + rd.r + '-' + crypto.randomBytes(4).toString('hex');
-  try {
-    const rec = await paystack.createRecipient({ name: col.fullName, phone: col.phone, provider: col.provider });
-    const tr = await paystack.transfer({ recipientCode: rec.recipient_code, amount: rd.net, reference, reason: (c.g.name || 'Susu') + ' round ' + (rd.r + 1) });
-    const status = tr.status === 'success' ? 'paid' : 'pending';
-    if (cur) await db.run('DELETE FROM payouts WHERE id=?', [cur.id]);
-    await db.run('INSERT INTO payouts(group_id,round,member_id,method,status,amount,reference,transfer_code,recorded_by,created_at,paid_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-      [c.g.id, rd.r, Number(col.uid), 'momo', status, rd.net, reference, tr.transfer_code || '', 'admin:' + req.me.name, now(), status === 'paid' ? now() : null]);
-    await log(c.g.id, 'admin:' + req.me.name, 'payout.momo.' + status, { r: rd.r, reference });
-    await sendState(req, res);
-  } catch (e) {
-    console.error('paystack transfer', e.message);
-    bad(res, 502, 'The transfer could not be sent: ' + e.message);
-  }
-}));
-
-/* ---------- Paystack webhook: the source of truth for MoMo results ---------- */
-app.post('/api/paystack/webhook', wrap(async (req, res) => {
-  if (!paystack.validSignature(req.rawBody || Buffer.alloc(0), req.get('x-paystack-signature'))) return res.status(401).end();
-  const ev = req.body || {}, d = ev.data || {};
-  try {
-    if (ev.event === 'charge.success' && d.reference) await settlePayment(d.reference, d);
-    else if (/^transfer\./.test(ev.event || '') && d.reference) {
-      const o = await db.get('SELECT * FROM payouts WHERE reference=?', [d.reference]);
-      if (o) {
-        const status = ev.event === 'transfer.success' ? 'paid' : (ev.event === 'transfer.failed' || ev.event === 'transfer.reversed') ? 'failed' : o.status;
-        await db.run('UPDATE payouts SET status=?, paid_at=? WHERE id=?', [status, status === 'paid' ? now() : null, o.id]);
-        await log(o.group_id, 'paystack', 'payout.momo.' + status, { r: o.round, reference: d.reference });
-      }
-    }
-  } catch (e) { console.error('webhook', e); }
-  res.status(200).end();
 }));
 
 /* ---------- the apps ---------- */
@@ -455,6 +338,6 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => console.log('Susu listening on http://localhost:' + PORT + (paystack.enabled() ? ' (mobile money on)' : ' (cash only: set PAYSTACK_SECRET_KEY to turn on MoMo)')));
+  app.listen(PORT, () => console.log('Susu listening on http://localhost:' + PORT + ''));
 }
 module.exports = app;

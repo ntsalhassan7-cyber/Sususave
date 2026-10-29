@@ -135,7 +135,7 @@ Object.assign(Susu,{esc:esc,fmtC:fmtC,fmt:fmt,fmtDate:fmtDate,fmtShort:fmtShort,
    Everything comes from GET /api/state. The page asks again every few seconds and after
    every change it makes, so admin and members see the same numbers. */
 S=Susu.state={uid:null,role:'',isAdmin:false,me:null,ready:false,fatal:'',offline:false,
-  code:'',settings:null,membersAll:[],payMap:{},payPending:{},outMap:{},outPending:{},momo:{enabled:false,providers:[]}};
+  code:'',settings:null,membersAll:[],payMap:{},outMap:{}};
 V=Susu.v={roster:[],mine:null,slots:[],extra:[],sched:[],nextIdx:-1,focusIdx:0};
 var subs=[];
 Susu.onChange=function(fn){subs.push(fn);return function(){subs=subs.filter(function(f){return f!==fn;});};};
@@ -170,7 +170,7 @@ async function api(method,path,body){
 Susu.api=api;
 function applySignedOut(){
   S.uid=null;S.role='';S.isAdmin=false;S.me=null;S.code='';S.settings=null;S.membersAll=[];
-  S.payMap={};S.payPending={};S.outMap={};S.outPending={};S.ready=true;S.offline=false;
+  S.payMap={};S.outMap={};S.ready=true;S.offline=false;
   emit();
 }
 /* Put a /api/state answer into S. */
@@ -179,12 +179,9 @@ function applyState(st){
   S.me=st.me;S.uid=st.me.uid;S.role=st.me.role;S.isAdmin=st.me.role==='admin';
   S.code=st.group.code;
   S.settings=st.group.settings?cleanSettings(st.group.settings,today):null;
-  S.membersAll=(st.members||[]).map(function(m){var c=L.cleanMember(m.uid,m);c.phone=m.phone||'';c.provider=m.provider||'';return c;});
-  S.payMap={};S.payPending={};
-  Object.keys(st.payments||{}).forEach(function(k){var p=st.payments[k];if(p.status==='paid')S.payMap[k]=p;else S.payPending[k]=p;});
-  S.outMap={};S.outPending={};
-  Object.keys(st.payouts||{}).forEach(function(k){var o=st.payouts[k];if(o.status==='paid')S.outMap[k]=o;else S.outPending[k]=o;});
-  S.momo=st.momo||{enabled:false,providers:[]};
+  S.membersAll=(st.members||[]).map(function(m){return L.cleanMember(m.uid,m);});
+  S.payMap={};Object.keys(st.payments||{}).forEach(function(k){var p=st.payments[k];if(p.status==='paid')S.payMap[k]=p;});
+  S.outMap={};Object.keys(st.payouts||{}).forEach(function(k){var o=st.payouts[k];if(o.status==='paid')S.outMap[k]=o;});
   S.ready=true;S.offline=false;S.fatal='';
   emit();
 }
@@ -239,12 +236,12 @@ function activity(forMember){
     var p=S.payMap[k],rd=V.sched[p.r],m=V.roster.filter(function(x){return x.uid===p.uid;})[0];
     if(!rd||!m||!isFinite(p.at))return;
     if(forMember&&m.uid!==S.uid)return;
-    ev.push({t:p.at,type:'dep',m:m,rd:rd,amt:p.amount||S.settings.base,method:p.method||'cash'});
+    ev.push({t:p.at,type:'dep',m:m,rd:rd,amt:p.amount||S.settings.base,by:p.by||''});
   });
   Object.keys(S.outMap).forEach(function(r){
     var rd=V.sched[+r],o=S.outMap[r];if(!rd||!o)return;
     var m=V.slots[rd.member];if(!m||!isFinite(o.at))return;
-    ev.push({t:o.at,type:'col',m:m,rd:rd,amt:o.amount||rd.net,method:o.method||'cash'});
+    ev.push({t:o.at,type:'col',m:m,rd:rd,amt:o.amount||rd.net,by:o.by||''});
   });
   if(forMember)V.roster.forEach(function(m){if(m.joinedAt)ev.push({t:m.joinedAt,type:'join',m:m,amt:0});});
   ev.sort(function(a,b){return b.t-a.t;});
@@ -260,7 +257,6 @@ function onTimeRate(){
 }
 function roundStatus(rd){
   if(S.outMap[rd.r])return ['Paid out','pill ok'];
-  if(S.outPending[rd.r]&&S.outPending[rd.r].status==='pending')return ['MoMo on its way','pill warn'];
   if(rd.r===V.nextIdx)return ['Next','pill line'];
   if(rd.iso<today)return ['Past','pill'];
   return ['Upcoming','pill'];
@@ -299,22 +295,6 @@ Susu.togglePayout=async function(r){
   var key='r'+r;if(busy[key])return '';busy[key]=1;
   var msg=await change('POST','/api/payouts/cash',{r:r,on:!S.outMap[r]});
   busy[key]=0;if(msg)Susu.toast(msg);return msg;
-};
-Susu.sendPayoutMomo=async function(r){
-  var key='m'+r;if(busy[key])return '';busy[key]=1;
-  var msg=await change('POST','/api/payouts/momo',{r:r});
-  busy[key]=0;if(msg)Susu.toast(msg);return msg;
-};
-Susu.saveMomo=function(phone,provider){return change('PUT','/api/me',{phone:phone,provider:provider});};
-/* A member pays their own round by MoMo: the server starts it with Paystack and we send
-   the member to Paystack's page to confirm on their phone. */
-Susu.payMomo=async function(r){
-  try{var res=await api('POST','/api/payments/momo/start',{r:r});location.assign(res.url);return '';}
-  catch(e){Susu.toast(e.message);return e.message;}
-};
-Susu.checkMomo=async function(reference){
-  try{var res=await api('GET','/api/payments/momo/status?reference='+encodeURIComponent(reference));applyState(res.state);return res.status;}
-  catch(e){Susu.toast(e.message);return '';}
 };
 
 /* Short message at the bottom of the page when something could not be done. */
@@ -380,7 +360,7 @@ Susu.startRouter=function(el,apps){
     if(stop)stop();
     cur=to;stop=apps[to].mount(el);
   }
-  window.addEventListener('hashchange',route);
+  window.addEventListener('hashchange',function(){route();if(S.role)Susu.refresh();});
   Susu.onChange(route);
   Susu.boot();
   route();
@@ -409,43 +389,32 @@ Susu.copySchedule=function(statusId,boxId){
 };
 
 /* ---------- payment tiles, shared by both apps ---------- */
-function payLabel(rd,m){
-  var k=rd.r+'_'+m.uid,p=S.payMap[k],q=S.payPending[k];
-  if(p)return [p.method==='momo'?'Paid by MoMo':'Paid',true];
-  if(q&&q.status==='pending')return ['Confirming MoMo',false];
-  if(q&&q.status==='failed')return ['MoMo failed',false];
-  return ['Not yet',false];
+/* "admin:boss" or "member:Ama Mensah" -> "the admin" / "Ama" */
+function byName(by){
+  by=String(by||'');
+  if(by.indexOf('admin:')===0)return 'the admin';
+  if(by.indexOf('member:')===0){var n=by.slice(7).trim();return n===S.me.name?'you':n.split(' ')[0];}
+  return '';
 }
+Susu.byName=byName;
 Susu.tilesHTML=function(rd,mode){
   var mark=canMark(rd,mode);
   return '<ul class="pay">'+rd.contributors.map(function(i){
     var m=V.slots[i];
     if(!m)return '<li><div class="tile open">'+Susu.ghost('')+'<span class="nm">Open place '+(i+1)+'<small>Not joined yet</small></span><span class="st">Waiting</span></div></li>';
-    var lb=payLabel(rd,m),on=lb[1],inner=Susu.av(m.avatar,'')+'<span class="nm">'+esc(m.fullName)+(m.uid===S.uid?' (you)':'')+'<small>'+esc(fmt(S.settings.base))+'</small></span><span class="st"><i aria-hidden="true">\u2713</i>'+lb[0]+'</span>';
-    return mark?'<li><button type="button" class="tile" data-act="paid" data-r="'+rd.r+'" data-u="'+esc(m.uid)+'" aria-pressed="'+on+'" title="Tap to record cash">'+inner+'</button></li>':'<li><div class="tile'+(on?' on':'')+'">'+inner+'</div></li>';
+    var p=S.payMap[rd.r+'_'+m.uid],on=!!p;
+    var sub=on?'Cash, '+esc(fmtWhen(p.at))+(byName(p.by)?' \u00b7 by '+esc(byName(p.by)):''):esc(fmt(S.settings.base));
+    var inner=Susu.av(m.avatar,'')+'<span class="nm">'+esc(m.fullName)+(m.uid===S.uid?' (you)':'')+'<small>'+sub+'</small></span><span class="st"><i aria-hidden="true">\u2713</i>'+(on?'Paid':'Not yet')+'</span>';
+    return mark?'<li><button type="button" class="tile" data-act="paid" data-r="'+rd.r+'" data-u="'+esc(m.uid)+'" aria-pressed="'+on+'" title="'+(on?'Tap to unmark':'Tap once the cash is handed over')+'">'+inner+'</button></li>':'<li><div class="tile'+(on?' on':'')+'">'+inner+'</div></li>';
   }).join('')+'</ul>';
-};
-/* The member's own MoMo button for a round they still owe. */
-Susu.momoHTML=function(rd){
-  var me=V.mine;if(!me||!S.momo.enabled)return '';
-  var i=myIdx();if(i<0||rd.contributors.indexOf(i)<0)return '';
-  var k=rd.r+'_'+me.uid;if(S.payMap[k])return '';
-  var q=S.payPending[k];
-  if(q&&q.status==='pending')return '<div class="momo-row"><span class="pill warn">Waiting for your MoMo confirmation</span><button type="button" class="btn small" data-act="momo-check" data-ref="'+esc(q.reference)+'">Check again</button><button type="button" class="btn small" data-act="momo-pay" data-r="'+rd.r+'">Start over</button></div>';
-  return '<div class="momo-row">'+(q&&q.status==='failed'?'<span class="pill">Last MoMo attempt did not go through</span>':'')+'<button type="button" class="btn primary" data-act="momo-pay" data-r="'+rd.r+'">'+Susu.ic('wallet')+'Pay '+esc(fmt(S.settings.base))+' by MoMo</button></div>';
 };
 Susu.actionsHTML=function(rd,mode){
   if(!canMark(rd,mode))return '';
-  var st=roundStats(rd),col=V.slots[rd.member],out=!!S.outMap[rd.r],pend=S.outPending[rd.r],everyone=st.pc===st.need&&st.need>0,me=col&&col.uid===S.uid;
-  var h='<div class="actions"><button type="button" class="btn wide" data-act="all" data-r="'+rd.r+'">'+(everyone?'Clear all cash marks for this round':'Mark everyone as paid (cash)')+'</button>';
+  var st=roundStats(rd),col=V.slots[rd.member],o=S.outMap[rd.r],out=!!o,everyone=st.pc===st.need&&st.need>0,me=col&&col.uid===S.uid;
+  var h='<div class="actions"><button type="button" class="btn wide" data-act="all" data-r="'+rd.r+'">'+(everyone?'Clear all marks for this round':'Mark everyone as paid')+'</button>';
   if(col){
-    if(out)h+='<button type="button" class="btn wide" data-act="out" data-r="'+rd.r+'" aria-pressed="true">\u2713 '+(S.outMap[rd.r].method==='momo'?'Sent by MoMo to ':'Money received by ')+(me?'you':esc(firstName(col)))+(S.outMap[rd.r].method==='momo'?'':' (tap to undo)')+'</button>';
-    else if(pend&&pend.status==='pending')h+='<span class="pill warn" style="justify-self:start">MoMo transfer to '+esc(firstName(col))+' is on its way</span>';
-    else{
-      h+='<button type="button" class="btn '+(mode==='admin'&&S.momo.enabled&&col.phone?'':'primary ')+'wide" data-act="out" data-r="'+rd.r+'" aria-pressed="false">'+(me?'I have received the money (cash)':'Mark cash as handed to '+esc(firstName(col)))+'</button>';
-      if(mode==='admin'&&S.momo.enabled)h+=col.phone?'<button type="button" class="btn primary wide" data-act="momo-out" data-r="'+rd.r+'">'+Susu.ic('wallet')+'Send '+esc(fmt(rd.net))+' to '+esc(firstName(col))+' by MoMo</button>':'<p class="hint">'+esc(firstName(col))+' has not added a MoMo number yet, so the pot can only be handed over as cash.</p>';
-      if(pend&&pend.status==='failed')h+='<p class="hint">The last MoMo transfer did not go through. You can try again or hand over cash.</p>';
-    }
+    if(out)h+='<button type="button" class="btn wide" data-act="out" data-r="'+rd.r+'" aria-pressed="true">\u2713 Cash received by '+(me?'you':esc(firstName(col)))+' \u00b7 '+esc(fmtWhen(o.at))+' (tap to undo)</button>';
+    else h+='<button type="button" class="btn primary wide" data-act="out" data-r="'+rd.r+'" aria-pressed="false">'+(me?'I have received the cash':'Mark cash as handed to '+esc(firstName(col)))+'</button>';
   }
   return h+'</div>';
 };
@@ -456,9 +425,6 @@ Susu.handleTrack=function(e,mode){
   if(a==='paid'){if(rd&&canMark(rd,mode))Susu.togglePaid(r,b.dataset.u);return true;}
   if(a==='all'){Susu.markAll(r,mode);return true;}
   if(a==='out'){if(rd&&canMark(rd,mode))Susu.togglePayout(r);return true;}
-  if(a==='momo-out'){if(rd&&mode==='admin'){b.disabled=true;Susu.sendPayoutMomo(r);}return true;}
-  if(a==='momo-pay'){if(rd){b.disabled=true;b.textContent='Opening MoMo\u2026';Susu.payMomo(r).then(function(m){if(m){b.disabled=false;}});}return true;}
-  if(a==='momo-check'){b.disabled=true;Susu.checkMomo(b.dataset.ref).then(function(s){b.disabled=false;if(s==='pending')Susu.toast('Not confirmed yet. Approve the prompt on your phone, then check again.');});return true;}
   return false;
 };
 

@@ -357,8 +357,8 @@ function mount(root){
     return ev.map(function(x){
       var dep=x.type==='dep';
       return '<div class="lrow tx"><span class="c-date">'+ic('cal')+esc(U.fmtWhen(x.t))+'</span>'+
-        '<span class="c-st"><span class="pill '+(dep?'ok':'accent')+'">'+(dep?'Deposit':'Collected')+'</span> <span class="pill">'+(x.method==='momo'?'MoMo':'Cash')+'</span></span>'+
-        '<span class="c-who">'+av(x.m.avatar,'s')+'<span><b>'+esc(x.m.fullName)+'</b><small>Round '+(x.rd.r+1)+'</small></span></span>'+
+        '<span class="c-st"><span class="pill '+(dep?'ok':'accent')+'">'+(dep?'Cash in':'Cash out')+'</span></span>'+
+        '<span class="c-who">'+av(x.m.avatar,'s')+'<span><b>'+esc(x.m.fullName)+'</b><small>Round '+(x.rd.r+1)+(U.byName(x.by)?' \u00b7 recorded by '+esc(U.byName(x.by)):'')+'</small></span></span>'+
         '<span class="c-amt num">'+(dep?'+ ':'&minus; ')+esc(fmt(x.amt))+'</span></div>';
     }).join('');
   }

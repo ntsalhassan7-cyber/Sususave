@@ -106,25 +106,6 @@ function mount(root){
   });
 
 
-  /* ---------- MoMo number, so the admin can send you the pot ---------- */
-  function momoCard(){
-    var me=S.me||{},nets={mtn:'MTN MoMo',vodafone:'Telecel Cash',airteltigo:'AT Money'};
-    var opts=['mtn','vodafone','airteltigo'].map(function(k){return '<option value="'+k+'"'+(me.provider===k?' selected':'')+'>'+nets[k]+'</option>';}).join('');
-    return '<form class="card" id="momo-form" autocomplete="off"><div class="sec-head"><h3>Your MoMo number</h3>'+(me.phone?'<span class="pill ok">Saved</span>':'<span class="pill warn">Not added</span>')+'</div>'+
-      '<p class="hint">'+(S.momo.enabled?'When it is your turn, the admin can send the pot straight to this number.':'The admin can use this number to send you the pot once mobile money is switched on.')+'</p>'+
-      '<div class="momo-row" style="margin-top:12px"><select id="momo-net" aria-label="Network">'+opts+'</select><input id="momo-phone" type="tel" inputmode="numeric" maxlength="10" placeholder="0241234567" aria-label="Mobile money number" value="'+esc(me.phone||'')+'" style="flex:1;min-width:150px"><button type="submit" class="btn primary" id="momo-save">Save</button></div>'+
-      '<p class="status" id="momo-status" aria-live="polite"></p></form>';
-  }
-  on($('us-pay-root'),'submit',async function(e){
-    var f=e.target.closest('#momo-form');if(!f)return;e.preventDefault();
-    var btn=$('momo-save');btn.disabled=true;
-    var msg=await U.saveMomo($('momo-phone').value.trim(),$('momo-net').value);
-    if(!live)return;btn.disabled=false;
-    if(!msg){btn.blur();render();}
-    $('momo-status').className='status'+(msg?' err':'');
-    U.say('momo-status',msg||'Saved.',5000);
-  });
-
   /* ---------- extra cards ---------- */
   function membersCard(){
     var st=S.settings,open=Math.max(0,st.n-V.roster.length);
@@ -231,10 +212,6 @@ function mount(root){
 
   /* ---------- payments ---------- */
   function renderPay(){
-    /* Live updates arrive every few seconds. While you are typing your MoMo number, leave the
-       page alone so the form is not rebuilt under your fingers. */
-    var typing=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#momo-form');
-    if(typing&&$('momo-form'))return;
     var root=$('us-pay-root'),st=S.settings,me=U.myIdx(),t=U.groupTotals(),tpct=t.planned>0?Math.min(100,Math.round(t.saved/t.planned*100)):0;
     var saved='<div class="card saved"><p class="cap">Saved by the group so far</p><p class="big num">'+esc(fmt(t.saved))+'</p><div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+tpct+'" aria-label="Group savings"><span style="width:'+tpct+'%"></span></div><p class="prog"><span>'+tpct+'% of the plan</span><span>Paid out: '+esc(fmt(t.out))+'</span></p></div>';
     if(me<0){root.innerHTML='<div class="col c12">'+saved+'<div class="note-card"><p class="hint">You do not have a place in the group yet.</p></div></div>';return;}
@@ -254,11 +231,12 @@ function mount(root){
     var paidCount=mine2.filter(function(r){return U.isPaid(r.r,V.mine);}).length;
     var list='';
     mine2.forEach(function(rd){
-      var p=U.isPaid(rd.r,V.mine),late=!p&&rd.iso<U.today,c=V.slots[rd.member],rec=S.payMap[rd.r+'_'+V.mine.uid],q=S.payPending[rd.r+'_'+V.mine.uid];
-      var lab=p?(rec.method==='momo'?'Paid by MoMo':'Paid'):q&&q.status==='pending'?'Confirming':late?'Not yet':'Coming up';
-      list+='<div class="act'+(rd.r===V.focusIdx?' is-me':'')+'">'+(c?av(c.avatar,''):ghost(''))+'<div class="t"><b>Round '+(rd.r+1)+' to '+esc(U.slotName(rd.member))+'</b><small>'+esc(U.fmtShort(rd.date))+' '+rd.date.getFullYear()+'</small>'+(p||rd.r>V.focusIdx?'':U.momoHTML(rd))+'</div><div class="a num" style="color:var(--fg)">'+esc(fmt(st.base))+'<small><span class="pill '+(p?'ok':late?'bad':q?'warn':'')+'">'+lab+'</span></small></div></div>';
+      var p=U.isPaid(rd.r,V.mine),late=!p&&rd.iso<U.today,c=V.slots[rd.member],rec=S.payMap[rd.r+'_'+V.mine.uid];
+      var lab=p?'Paid':late?'Not yet':'Coming up';
+      var when=p?'Cash, '+esc(U.fmtWhen(rec.at))+(U.byName(rec.by)?' \u00b7 recorded by '+esc(U.byName(rec.by)):''):esc(U.fmtShort(rd.date))+' '+rd.date.getFullYear();
+      list+='<div class="act'+(rd.r===V.focusIdx?' is-me':'')+'">'+(c?av(c.avatar,''):ghost(''))+'<div class="t"><b>Round '+(rd.r+1)+' to '+esc(U.slotName(rd.member))+'</b><small>'+when+'</small></div><div class="a num" style="color:var(--fg)">'+esc(fmt(st.base))+'<small><span class="pill '+(p?'ok':late?'bad':'')+'">'+lab+'</span></small></div></div>';
     });
-    var right='<div class="card"><div class="sec-head"><h3>Your payments</h3></div><p class="hint">'+paidCount+' of '+mine2.length+' paid \u00b7 '+esc(fmt(paidCount*st.base))+' so far. '+(S.momo.enabled?'Pay by MoMo from here, or hand cash to the collector and they will mark it.':'Hand your cash to the collector or the admin, and they will mark it here.')+'</p><div class="feed">'+list+'</div></div>'+momoCard();
+    var right='<div class="card"><div class="sec-head"><h3>Your payments</h3></div><p class="hint">'+paidCount+' of '+mine2.length+' paid \u00b7 '+esc(fmt(paidCount*st.base))+' so far. Hand your cash to the collector or the admin, and they will mark it here.</p><div class="feed">'+list+'</div></div>';
     var top='<div class="ug2">'+saved+standingCard(me)+'</div>';
     root.innerHTML='<div class="col c12">'+top+'</div><div class="col c7">'+(left||right)+'</div><div class="col c5">'+(left?right:'')+upcomingCard()+'</div>';
   }
