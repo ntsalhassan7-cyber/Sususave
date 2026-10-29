@@ -145,7 +145,7 @@ function emit(){
 }
 function derive(){
   V.roster=S.membersAll;
-  V.mine=V.roster.filter(function(m){return m.uid===S.uid;})[0]||null;
+  V.mine=S.role==='member'?(V.roster.filter(function(m){return m.uid===S.uid;})[0]||null):null;
   if(!S.settings){V.slots=[];V.extra=[];V.sched=[];V.nextIdx=-1;V.focusIdx=0;return;}
   var rs=rosterSlots(V.roster,S.settings.n);
   V.slots=rs.slots;V.extra=rs.extra;
@@ -209,7 +209,9 @@ Susu.boot=function(){
 };
 
 /* ---------- derived numbers ---------- */
-function myIdx(){for(var i=0;i<V.slots.length;i++){if(V.slots[i]&&V.slots[i].uid===S.uid)return i;}return -1;}
+/* The signed-in member, never the admin (admins and members have separate ids). */
+function isMe(m){return !!(m&&S.role==='member'&&m.uid===S.uid);}
+function myIdx(){for(var i=0;i<V.slots.length;i++){if(isMe(V.slots[i]))return i;}return -1;}
 function isPaid(r,m){return !!S.payMap[r+'_'+m.uid];}
 function roundStats(rd){
   var pc=0,need=0;
@@ -263,9 +265,9 @@ function roundStatus(rd){
 }
 function canMark(rd,mode){
   if(mode==='admin')return S.isAdmin;
-  var m=V.slots[rd.member];return !!(m&&m.uid===S.uid);
+  return isMe(V.slots[rd.member]);
 }
-Object.assign(Susu,{myIdx:myIdx,isPaid:isPaid,roundStats:roundStats,groupTotals:groupTotals,pctOf:pctOf,groupBadge:groupBadge,activity:activity,onTimeRate:onTimeRate,roundStatus:roundStatus,canMark:canMark});
+Object.assign(Susu,{isMe:isMe,myIdx:myIdx,isPaid:isPaid,roundStats:roundStats,groupTotals:groupTotals,pctOf:pctOf,groupBadge:groupBadge,activity:activity,onTimeRate:onTimeRate,roundStatus:roundStatus,canMark:canMark});
 
 
 /* ---------- writes (each answers with the fresh state) ---------- */
@@ -277,6 +279,7 @@ async function change(method,path,body){
 Susu.change=change;
 Susu.saveSettings=function(draft){return change('PUT','/api/settings',draft);};
 Susu.toggleOpen=function(){return change('POST','/api/settings/open');};
+Susu.shuffle=function(){return change('POST','/api/members/shuffle');};
 Susu.removeMember=function(u){return change('DELETE','/api/members/'+encodeURIComponent(u));};
 Susu.resetMemberPassword=async function(u,pw){try{await api('POST','/api/members/'+encodeURIComponent(u)+'/password',{password:pw});return '';}catch(e){return e.message;}};
 Susu.togglePaid=async function(r,u){
@@ -404,13 +407,13 @@ Susu.tilesHTML=function(rd,mode){
     if(!m)return '<li><div class="tile open">'+Susu.ghost('')+'<span class="nm">Open place '+(i+1)+'<small>Not joined yet</small></span><span class="st">Waiting</span></div></li>';
     var p=S.payMap[rd.r+'_'+m.uid],on=!!p;
     var sub=on?'Cash, '+esc(fmtWhen(p.at))+(byName(p.by)?' \u00b7 by '+esc(byName(p.by)):''):esc(fmt(S.settings.base));
-    var inner=Susu.av(m.avatar,'')+'<span class="nm">'+esc(m.fullName)+(m.uid===S.uid?' (you)':'')+'<small>'+sub+'</small></span><span class="st"><i aria-hidden="true">\u2713</i>'+(on?'Paid':'Not yet')+'</span>';
+    var inner=Susu.av(m.avatar,'')+'<span class="nm">'+esc(m.fullName)+(isMe(m)?' (you)':'')+'<small>'+sub+'</small></span><span class="st"><i aria-hidden="true">\u2713</i>'+(on?'Paid':'Not yet')+'</span>';
     return mark?'<li><button type="button" class="tile" data-act="paid" data-r="'+rd.r+'" data-u="'+esc(m.uid)+'" aria-pressed="'+on+'" title="'+(on?'Tap to unmark':'Tap once the cash is handed over')+'">'+inner+'</button></li>':'<li><div class="tile'+(on?' on':'')+'">'+inner+'</div></li>';
   }).join('')+'</ul>';
 };
 Susu.actionsHTML=function(rd,mode){
   if(!canMark(rd,mode))return '';
-  var st=roundStats(rd),col=V.slots[rd.member],o=S.outMap[rd.r],out=!!o,everyone=st.pc===st.need&&st.need>0,me=col&&col.uid===S.uid;
+  var st=roundStats(rd),col=V.slots[rd.member],o=S.outMap[rd.r],out=!!o,everyone=st.pc===st.need&&st.need>0,me=isMe(col);
   var h='<div class="actions"><button type="button" class="btn wide" data-act="all" data-r="'+rd.r+'">'+(everyone?'Clear all marks for this round':'Mark everyone as paid')+'</button>';
   if(col){
     if(out)h+='<button type="button" class="btn wide" data-act="out" data-r="'+rd.r+'" aria-pressed="true">\u2713 Cash received by '+(me?'you':esc(firstName(col)))+' \u00b7 '+esc(fmtWhen(o.at))+' (tap to undo)</button>';

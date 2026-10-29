@@ -87,7 +87,7 @@ function settingsOf(g) {
   };
 }
 function memberOut(m) {
-  return { uid: String(m.id), fullName: m.full_name, username: m.username, avatar: m.avatar, joinedAt: m.joined_at };
+  return { uid: String(m.id), fullName: m.full_name, username: m.username, avatar: m.avatar, joinedAt: m.joined_at, slot: m.slot === undefined ? null : m.slot };
 }
 async function ctx(gid) {
   const g = await db.get('SELECT * FROM groups WHERE id=?', [gid]);
@@ -199,7 +199,9 @@ app.post('/api/member/signup', throttle, wrap(async (req, res) => {
   if ((await countMembers(g.id)) >= g.n) return bad(res, 409, 'This group is full. All ' + g.n + ' places are taken.');
   if (await db.get('SELECT 1 FROM members WHERE group_id=? AND username=?', [g.id, u])) return bad(res, 409, 'That username is taken in this group. Try another.');
   const hash = await bcrypt.hash(pw, 10);
-  const id = (await db.run('INSERT INTO members(group_id,full_name,username,pw_hash,avatar,joined_at) VALUES (?,?,?,?,?,?)', [g.id, full, u, hash, avatar, now()])).id;
+  const drawn = (await db.get('SELECT MAX(slot) AS m FROM members WHERE group_id=?', [g.id])).m;
+  const slot = drawn === null || drawn === undefined ? null : drawn + 1;
+  const id = (await db.run('INSERT INTO members(group_id,full_name,username,pw_hash,avatar,joined_at,slot) VALUES (?,?,?,?,?,?,?)', [g.id, full, u, hash, avatar, now(), slot])).id;
   req.session = { role: 'member', id };
   await log(g.id, 'member:' + u, 'member.join', { full });
   await sendState(req, res);
@@ -249,6 +251,17 @@ app.put('/api/settings', adminOnly, wrap(async (req, res) => {
 app.post('/api/settings/open', adminOnly, wrap(async (req, res) => {
   const g = await db.get('SELECT open FROM groups WHERE id=?', [req.me.gid]);
   await db.run('UPDATE groups SET open=? WHERE id=?', [g.open ? 0 : 1, req.me.gid]);
+  await sendState(req, res);
+}));
+/* Draw a random collection order. Allowed until the first pot has been handed over. */
+app.post('/api/members/shuffle', adminOnly, wrap(async (req, res) => {
+  const paidOut = (await db.get("SELECT COUNT(*) AS n FROM payouts WHERE group_id=? AND status='paid'", [req.me.gid])).n;
+  if (paidOut) return bad(res, 409, 'A pot has already been handed over, so the order is fixed now.');
+  const ids = (await db.all('SELECT id FROM members WHERE group_id=?', [req.me.gid])).map((m) => m.id);
+  if (ids.length < 2) return bad(res, 409, 'At least two people need to have joined before you can shuffle.');
+  for (let i = ids.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+  await db.batch(ids.map((id, i) => ['UPDATE members SET slot=? WHERE id=?', [i, id]]));
+  await log(req.me.gid, 'admin:' + req.me.name, 'members.shuffle', { order: ids });
   await sendState(req, res);
 }));
 app.delete('/api/members/:id', adminOnly, wrap(async (req, res) => {

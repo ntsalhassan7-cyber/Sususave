@@ -50,6 +50,7 @@ const SCHEMA = [
   phone TEXT NOT NULL DEFAULT '',
   provider TEXT NOT NULL DEFAULT '',
   joined_at INTEGER NOT NULL,
+  slot INTEGER,
   UNIQUE(group_id, username)
 )`,
 `CREATE TABLE IF NOT EXISTS payments (
@@ -97,7 +98,11 @@ const SCHEMA = [
 
 let readyP = null;
 function ready() {
-  if (!readyP) readyP = (async () => { for (const s of SCHEMA) await client.execute(s); })();
+  if (!readyP) readyP = (async () => {
+    for (const s of SCHEMA) await client.execute(s);
+    /* Columns added after the first release. Ignored when they already exist. */
+    for (const s of ['ALTER TABLE members ADD COLUMN slot INTEGER']) { try { await client.execute(s); } catch (e) { /* exists */ } }
+  })();
   return readyP;
 }
 

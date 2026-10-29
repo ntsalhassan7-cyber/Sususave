@@ -57,8 +57,10 @@ function cleanSettings(o,today){
   };
 }
 function toSched(st){return {n:st.n,cycles:st.cycles,every:st.every,unit:st.unit,start:st.start,base:st.base,fee:st.fee,self:st.self};}
+/* Collection order: a drawn place (after the admin shuffles) comes first, then joining order. */
 function sortRoster(roster){
-  return roster.slice().sort(function(a,b){return (a.joinedAt-b.joinedAt)||(a.uid<b.uid?-1:a.uid>b.uid?1:0);});
+  function key(m){return (m.slot===null||m.slot===undefined||!isFinite(m.slot))?Infinity:Number(m.slot);}
+  return roster.slice().sort(function(a,b){return (key(a)-key(b))||(a.joinedAt-b.joinedAt)||(a.uid<b.uid?-1:a.uid>b.uid?1:0);});
 }
 function rosterSlots(roster,n){
   var sorted=sortRoster(roster),slots=sorted.slice(0,n);
@@ -73,7 +75,8 @@ function cleanMember(id,o){
     fullName:typeof o.fullName==='string'&&o.fullName.trim()?o.fullName.trim().slice(0,60):'Member',
     username:typeof o.username==='string'?o.username.slice(0,20):'',
     avatar:Math.min(19,Math.max(0,Math.round(Number(o.avatar))||0)),
-    joinedAt:Number(o.joinedAt)||0};
+    joinedAt:Number(o.joinedAt)||0,
+    slot:(o.slot===null||o.slot===undefined||o.slot==='')?null:Number(o.slot)};
 }
 function ticksOn(pct,count){return Math.round(Math.max(0,Math.min(100,pct))/100*count);}
 return {pad:pad,round2:round2,parseDate:parseDate,iso:iso,buildSchedule:buildSchedule,clamp:clamp,cleanSettings:cleanSettings,toSched:toSched,sortRoster:sortRoster,rosterSlots:rosterSlots,normUser:normUser,validUser:validUser,cleanMember:cleanMember,ticksOn:ticksOn};

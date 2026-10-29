@@ -151,7 +151,7 @@ function mount(root){
     if(!ev.length)return '<p class="hint" style="padding:12px 0">'+emptyText+'</p>';
     return ev.map(function(x){
       var what=x.type==='dep'?'Deposited':x.type==='col'?'Collected':'Joined the group';
-      var who=x.m.uid===S.uid&&x.type!=='col'?'You':x.m.fullName;
+      var who=U.isMe(x.m)&&x.type!=='col'?'You':x.m.fullName;
       return '<div class="act">'+av(x.m.avatar,'')+'<div class="t"><b>'+esc(who)+'</b><small>'+what+' \u00b7 '+esc(U.fmtWhen(x.t))+'</small></div>'+
         (x.amt?'<div class="a num">+'+esc(fmt(x.amt))+'</div>':'')+'</div>';
     }).join('');
