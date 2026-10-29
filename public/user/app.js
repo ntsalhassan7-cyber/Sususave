@@ -120,6 +120,7 @@ function mount(root){
     var btn=$('momo-save');btn.disabled=true;
     var msg=await U.saveMomo($('momo-phone').value.trim(),$('momo-net').value);
     if(!live)return;btn.disabled=false;
+    if(!msg){btn.blur();render();}
     $('momo-status').className='status'+(msg?' err':'');
     U.say('momo-status',msg||'Saved.',5000);
   });
@@ -230,6 +231,10 @@ function mount(root){
 
   /* ---------- payments ---------- */
   function renderPay(){
+    /* Live updates arrive every few seconds. While you are typing your MoMo number, leave the
+       page alone so the form is not rebuilt under your fingers. */
+    var typing=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#momo-form');
+    if(typing&&$('momo-form'))return;
     var root=$('us-pay-root'),st=S.settings,me=U.myIdx(),t=U.groupTotals(),tpct=t.planned>0?Math.min(100,Math.round(t.saved/t.planned*100)):0;
     var saved='<div class="card saved"><p class="cap">Saved by the group so far</p><p class="big num">'+esc(fmt(t.saved))+'</p><div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+tpct+'" aria-label="Group savings"><span style="width:'+tpct+'%"></span></div><p class="prog"><span>'+tpct+'% of the plan</span><span>Paid out: '+esc(fmt(t.out))+'</span></p></div>';
     if(me<0){root.innerHTML='<div class="col c12">'+saved+'<div class="note-card"><p class="hint">You do not have a place in the group yet.</p></div></div>';return;}
