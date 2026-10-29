@@ -253,6 +253,28 @@ app.post('/api/settings/open', adminOnly, wrap(async (req, res) => {
   await db.run('UPDATE groups SET open=? WHERE id=?', [g.open ? 0 : 1, req.me.gid]);
   await sendState(req, res);
 }));
+/* Sign-in links: the admin sends a member their own link (WhatsApp, SMS). Tapping it signs
+   them in on that phone, so nobody has to type a code, username or password. */
+function siteUrl(req) { return req.protocol + '://' + req.get('host'); }
+app.get('/api/members/:id/link', adminOnly, wrap(async (req, res) => {
+  const m = await db.get('SELECT * FROM members WHERE id=? AND group_id=?', [Number(req.params.id), req.me.gid]);
+  if (!m) return bad(res, 404, 'No such member.');
+  let token = m.link_token;
+  if (!token || req.query.reset === '1') {
+    token = crypto.randomBytes(15).toString('base64url');
+    await db.run('UPDATE members SET link_token=? WHERE id=?', [token, m.id]);
+    await log(req.me.gid, 'admin:' + req.me.name, 'member.link', { member: m.username, reset: req.query.reset === '1' });
+  }
+  res.json({ url: siteUrl(req) + '/s/' + token, name: m.full_name });
+}));
+app.get('/s/:token', wrap(async (req, res) => {
+  const t = String(req.params.token || '');
+  const m = t.length >= 16 ? await db.get('SELECT id FROM members WHERE link_token=?', [t]) : null;
+  if (!m) return res.redirect('/#login?bad-link');
+  req.session = { role: 'member', id: m.id };
+  res.redirect('/#home');
+}));
+
 /* Draw a random collection order. Allowed until the first pot has been handed over. */
 app.post('/api/members/shuffle', adminOnly, wrap(async (req, res) => {
   const paidOut = (await db.get("SELECT COUNT(*) AS n FROM payouts WHERE group_id=? AND status='paid'", [req.me.gid])).n;

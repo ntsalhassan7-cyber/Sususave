@@ -120,3 +120,32 @@ details.mine .tile[aria-pressed="true"]{background:var(--pos-soft)}
 
 /* hero (home): the deep green card after Susu Circle */
 .us .card.hero{background:var(--grad);color:var(--hero-fg);border:0;padding:28px 30px}
+
+/* easy mode: big type, big buttons, few words */
+body.app-user{font-size:18px}
+.us .btn{min-height:3.4rem;font-size:1.05rem;padding-inline:1.5rem}
+.us .btn.big{min-height:3.9rem;font-size:1.15rem}
+.us .tile{min-height:4.4rem;grid-template-columns:3rem minmax(0,1fr) auto;font-size:1.05rem}
+.us .tile .st{font-size:1rem}
+.us .tile .st i{width:2rem;height:2rem;font-size:1rem}
+.us .pill{font-size:.86rem;padding:.3rem .8rem}
+.us .hint{font-size:.95rem}
+.us .navpill a{min-height:3.1rem;font-size:1.02rem}
+.us h3{font-size:1.15rem}
+.us .act .t b{font-size:1.02rem}
+.us .act .t small{font-size:.88rem}
+.card.now{display:grid;gap:12px;padding:26px 24px;border-width:2px}
+.card.now.late{border-color:var(--bad)}
+.card.now.done{border-color:var(--pos-text);background:var(--pos-soft)}
+.card.now.mine{border-color:var(--forest)}
+.now-h{font-family:var(--display);font-weight:800;font-size:clamp(1.45rem,3.4vw,2rem);line-height:1.15;letter-spacing:-.02em}
+.now-p{font-size:1.08rem;line-height:1.5}
+.now-big{font-family:var(--display);font-weight:800;font-size:clamp(2.4rem,7vw,3.6rem);line-height:1;letter-spacing:-.03em}
+.now-who{display:flex;align-items:center;gap:14px}
+.now-name{font-family:var(--display);font-weight:700;font-size:1.4rem;line-height:1.2}
+details.more{margin-top:8px}
+details.more > summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:8px;min-height:3.2rem;padding:0 20px;border:1.5px solid var(--line2);border-radius:99px;font-weight:600;font-size:1rem;background:var(--surface)}
+details.more > summary::-webkit-details-marker{display:none}
+details.more > summary::after{content:"+";font-size:1.3rem;line-height:1}
+details.more[open] > summary::after{content:"\2212"}
+details.more > .card{margin-top:16px}

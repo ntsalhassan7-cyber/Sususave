@@ -51,6 +51,7 @@ const SCHEMA = [
   provider TEXT NOT NULL DEFAULT '',
   joined_at INTEGER NOT NULL,
   slot INTEGER,
+  link_token TEXT,
   UNIQUE(group_id, username)
 )`,
 `CREATE TABLE IF NOT EXISTS payments (
@@ -101,7 +102,7 @@ function ready() {
   if (!readyP) readyP = (async () => {
     for (const s of SCHEMA) await client.execute(s);
     /* Columns added after the first release. Ignored when they already exist. */
-    for (const s of ['ALTER TABLE members ADD COLUMN slot INTEGER']) { try { await client.execute(s); } catch (e) { /* exists */ } }
+    for (const s of ['ALTER TABLE members ADD COLUMN slot INTEGER', 'ALTER TABLE members ADD COLUMN link_token TEXT']) { try { await client.execute(s); } catch (e) { /* exists */ } }
   })();
   return readyP;
 }

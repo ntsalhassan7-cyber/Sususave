@@ -36,7 +36,7 @@ var SHELL=
       '<div class="pwrow"><input id="si-pw" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password"><button type="button" class="btn small" data-show="si-pw">Show</button></div>'+
       '<p class="err" id="si-err" role="alert"></p>'+
       '<button type="submit" class="btn primary wide big" id="si-btn">Sign in</button>'+
-      '<p class="hint center">Forgot your password? Ask the admin to set a new one for you.</p>'+
+      '<p class="hint center">Easier: ask your admin for your sign-in link and just tap it.<br>Forgot your password? The admin can set a new one.</p>'+
       '<p class="center" id="si-new"><button type="button" class="linkbtn" data-act="to-signup">New here? Join your group</button></p>'+
     '</form>'+
 

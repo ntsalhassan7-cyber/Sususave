@@ -60,7 +60,7 @@ async function shot(page, name) { await page.screenshot({ path: path.join(OUT, n
     if (user === 'ama') await shot(p, 'login-join');
     await p.click('#su-btn');
     await p.waitForURL(/#home/);
-    await p.waitForSelector('.card.hero');
+    await p.waitForSelector('.card.now');
     return p;
   }
   const m1 = await join('Ama Mensah', 'ama', 'secret1', 2);

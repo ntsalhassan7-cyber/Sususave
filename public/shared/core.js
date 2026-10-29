@@ -279,6 +279,7 @@ async function change(method,path,body){
 Susu.change=change;
 Susu.saveSettings=function(draft){return change('PUT','/api/settings',draft);};
 Susu.toggleOpen=function(){return change('POST','/api/settings/open');};
+Susu.memberLink=async function(u,reset){try{return await api('GET','/api/members/'+encodeURIComponent(u)+'/link'+(reset?'?reset=1':''));}catch(e){return {error:e.message};}};
 Susu.shuffle=function(){return change('POST','/api/members/shuffle');};
 Susu.removeMember=function(u){return change('DELETE','/api/members/'+encodeURIComponent(u));};
 Susu.resetMemberPassword=async function(u,pw){try{await api('POST','/api/members/'+encodeURIComponent(u)+'/password',{password:pw});return '';}catch(e){return e.message;}};
