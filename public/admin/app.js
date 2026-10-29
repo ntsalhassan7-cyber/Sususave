@@ -58,7 +58,7 @@ var SHELL=
 function mount(root){
   var page='',lastPage='',first=true,chromeSig='';
   var draft=null,dirty=false,saving=false,customFreq=false;
-  var rmConfirm='',shuffleConfirm=false,viewRound=0,timers={},live=true;
+  var rmConfirm='',arrange=null,viewRound=0,timers={},live=true;
   var offs=[];
   function on(el,ev,fn,opt){el.addEventListener(ev,fn,opt);offs.push(function(){el.removeEventListener(ev,fn,opt);});}
 
@@ -251,10 +251,17 @@ function mount(root){
     if(!st){root.innerHTML=needGroup();return;}
     var n=st.n,filled=Math.min(V.roster.length,n),pct=Math.round(filled/n*100),open=st.open!==false,full=V.roster.length>=n;
     function rmBtn(m){return '<button type="button" class="btn small" data-act="link" data-u="'+esc(m.uid)+'" title="Copy a sign-in link to send to this member">'+ic('copy')+'Link</button> <button type="button" class="btn small" data-act="pw" data-u="'+esc(m.uid)+'" title="Set a new password for this member">Password</button> <button type="button" class="btn small'+(rmConfirm===m.uid?' danger':'')+'" data-act="rm" data-u="'+esc(m.uid)+'">'+(rmConfirm===m.uid?'Tap again to remove':'Remove')+'</button>';}
-    var rows=V.slots.map(function(m,i){
+    var locked=Object.keys(S.outMap).length>0;
+    function row(m,i,arr){
       if(!m)return '<div class="lrow pp"><span class="c-no">'+(i+1)+'</span><span class="c-who">'+ghost('')+'<span><b class="c-dim">Open place</b><small>Waiting for someone to join</small></span></span><span class="c-meta"></span><span class="c-act"></span></div>';
-      return '<div class="lrow pp"><span class="c-no">'+(i+1)+'</span><span class="c-who">'+av(m.avatar,'')+'<span><b>'+esc(m.fullName)+'</b><small>@'+esc(m.username)+'</small></span></span><span class="c-meta c-dim">Joined '+esc(U.fmtDM(new Date(m.joinedAt)))+'</span><span class="c-act">'+rmBtn(m)+'</span></div>';
-    }).join('');
+      var act=arr?'<button type="button" class="btn small" data-act="up" data-u="'+esc(m.uid)+'" aria-label="Move '+esc(U.firstName(m))+' up"'+(i===0?' disabled':'')+'>\u2191 Up</button> <button type="button" class="btn small" data-act="down" data-u="'+esc(m.uid)+'" aria-label="Move '+esc(U.firstName(m))+' down"'+(i===arrange.length-1?' disabled':'')+'>\u2193 Down</button>':rmBtn(m);
+      return '<div class="lrow pp"><span class="c-no">'+(i+1)+'</span><span class="c-who">'+av(m.avatar,'')+'<span><b>'+esc(m.fullName)+'</b><small>@'+esc(m.username)+'</small></span></span><span class="c-meta c-dim">'+(arr?'':'Joined '+esc(U.fmtDM(new Date(m.joinedAt))))+'</span><span class="c-act">'+act+'</span></div>';
+    }
+    var rows=arrange?arrange.map(function(u,i){return row(V.roster.filter(function(x){return x.uid===u;})[0],i,true);}).join(''):V.slots.map(function(m,i){return row(m,i,false);}).join('');
+    var modes=[['joined','In joining order'],['random','Draw at random'],['custom','I choose the order']];
+    var orderUI=locked?'<p class="hint">The order is fixed now, because the first pot has been handed over.</p>':
+      '<div class="order-pick" role="group" aria-label="How the order is decided">'+modes.map(function(md){return '<button type="button" class="btn small'+(S.orderMode===md[0]&&!arrange?' on':'')+(arrange&&md[0]==='custom'?' on':'')+'" data-act="mode" data-mode="'+md[0]+'">'+md[1]+'</button>';}).join('')+'</div>'+
+      (arrange?'<p class="hint" style="margin-top:10px">Move people with the arrows, then save.</p><div class="order-save"><button type="button" class="btn primary" data-act="save-order">Save this order</button><button type="button" class="btn" data-act="cancel-order">Cancel</button></div>':'');
     var ex=V.extra.length?'<h3 style="margin:22px 0 4px">No place yet</h3><p class="hint">The group size is smaller than the number of people who joined. Raise it on the Group page to give them a place.</p>'+V.extra.map(function(m){
       return '<div class="lrow pp"><span class="c-no">&ndash;</span><span class="c-who">'+av(m.avatar,'')+'<span><b>'+esc(m.fullName)+'</b><small>@'+esc(m.username)+'</small></span></span><span class="c-meta"></span><span class="c-act">'+rmBtn(m)+'</span></div>';
     }).join(''):'';
@@ -269,9 +276,9 @@ function mount(root){
       '<div class="card hero c7"><div class="card-head" style="margin-bottom:0"><div><p class="eyebrow">Places filled</p><p class="hero-h"><b>'+filled+'</b> of '+n+' people have joined</p></div>'+
         '<button type="button" class="btn small" data-act="open">'+(open?'Close sign-ups':'Open sign-ups')+'</button></div>'+
         ticks(pct)+'<div class="scale"><span>'+(full?'The group is full. ':'')+(open?'Sign-ups are open.':'Sign-ups are closed.')+'</span><span>'+pct+'%</span></div></div>'+
-      '<div class="card c8"><div class="card-head"><h3>Members in collection order</h3>'+(V.roster.length>=2?'<button type="button" class="btn small'+(shuffleConfirm?' danger':'')+'" data-act="shuffle">'+ic('swap')+(shuffleConfirm?'Tap again to draw a new order':'Shuffle the order')+'</button>':'')+'</div><div>'+
+      '<div class="card c8"><div class="card-head"><h3>Who receives first, second, third</h3></div>'+orderUI+'<div style="margin-top:14px">'+
         '<div class="lhead pp"><span>No.</span><span>Member</span><span>Joined</span><span></span></div>'+rows+ex+
-        '<p class="hint" style="margin-top:14px">'+(V.roster.some(function(m){return m.slot!==null;})?'This order was drawn at random. Anyone who joins later goes to the end.':'People collect in the order they joined. Shuffle to draw the order at random instead.')+' You can shuffle until the first pot is handed over.</p></div></div>'+
+        '<p class="hint" style="margin-top:14px">'+(S.orderMode==='joined'?'People receive in the order they joined. Anyone who joins later goes to the end.':S.orderMode==='random'?'This order was drawn at random. Anyone who joins later goes to the end.':'You chose this order. Anyone who joins later goes to the end.')+'</p></div></div>'+
       '<div class="stack c4"><div class="card"><div class="card-head"><h3>Join code</h3></div><div class="code-box"><b id="join-code">'+esc(S.code)+'</b><button type="button" class="btn small" data-act="copycode">'+ic('copy')+'Copy</button></div><p class="hint" style="margin-top:10px">Members type this code on the login page to join or sign in. Share it with the link to this site.</p><p class="status" id="code-status" aria-live="polite"></p></div>'+latestJoinedCard()+'<div class="card"><h3>How people join</h3><ol class="how"><li>Send each member the link to this site and the join code above.</li><li>They choose Member, type the code, and create an account with their name, a username, a password and an icon. If that is hard for someone, create the account for them, then tap <b>Link</b> next to their name and send them that link: tapping it signs them in with no typing.</li><li>They get the next free number. You do not type any names, and number 1 collects first.</li></ol></div></div>'+
       '<div class="c7">'+settingsCard()+'</div><div class="c5">'+upcomingCard()+'</div>';
   }
@@ -279,12 +286,25 @@ function mount(root){
     var b=e.target.closest('button');if(!b)return;
     var act=b.dataset.act;
     if(act==='open'){await U.toggleOpen();}
-    else if(act==='shuffle'){
-      if(!shuffleConfirm){shuffleConfirm=true;clearTimeout(timers.sh);timers.sh=setTimeout(function(){shuffleConfirm=false;render();},4000);render();return;}
-      shuffleConfirm=false;clearTimeout(timers.sh);
-      var smsg=await U.shuffle();
-      U.toast(smsg||'New order drawn. Number 1 collects first.');
+    else if(act==='mode'){
+      var md=b.dataset.mode;
+      if(md==='custom'){arrange=V.slots.filter(Boolean).concat(V.extra).map(function(m){return m.uid;});render();return;}
+      arrange=null;
+      var omsg=await U.setOrder(md);
+      U.toast(omsg||(md==='random'?'New order drawn. Number 1 receives first.':'Back to joining order.'));
     }
+    else if(act==='up'||act==='down'){
+      if(!arrange)return;
+      var k=arrange.indexOf(b.dataset.u),to=act==='up'?k-1:k+1;
+      if(k<0||to<0||to>=arrange.length)return;
+      arrange.splice(k,1);arrange.splice(to,0,b.dataset.u);render();
+    }
+    else if(act==='save-order'){
+      var ids=arrange;arrange=null;
+      var cmsg=await U.setOrder('custom',ids);
+      U.toast(cmsg||'Order saved. Number 1 receives first.');
+    }
+    else if(act==='cancel-order'){arrange=null;render();}
     else if(act==='copycode'){
       var code=S.code;
       try{await navigator.clipboard.writeText(code);U.say('code-status','Copied.',3000);}catch(ex){U.say('code-status','Select the code and copy it.',4000);}

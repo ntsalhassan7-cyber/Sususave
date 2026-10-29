@@ -31,6 +31,7 @@ const SCHEMA = [
   self INTEGER NOT NULL DEFAULT 1,
   open INTEGER NOT NULL DEFAULT 1,
   setup INTEGER NOT NULL DEFAULT 0,
+  order_mode TEXT NOT NULL DEFAULT 'joined',
   created_at INTEGER NOT NULL
 )`,
 `CREATE TABLE IF NOT EXISTS admins (
@@ -102,7 +103,7 @@ function ready() {
   if (!readyP) readyP = (async () => {
     for (const s of SCHEMA) await client.execute(s);
     /* Columns added after the first release. Ignored when they already exist. */
-    for (const s of ['ALTER TABLE members ADD COLUMN slot INTEGER', 'ALTER TABLE members ADD COLUMN link_token TEXT']) { try { await client.execute(s); } catch (e) { /* exists */ } }
+    for (const s of ['ALTER TABLE members ADD COLUMN slot INTEGER', 'ALTER TABLE members ADD COLUMN link_token TEXT', "ALTER TABLE groups ADD COLUMN order_mode TEXT NOT NULL DEFAULT 'joined'"]) { try { await client.execute(s); } catch (e) { /* exists */ } }
   })();
   return readyP;
 }

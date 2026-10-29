@@ -177,7 +177,7 @@ function applySignedOut(){
 function applyState(st){
   if(!st||!st.me){applySignedOut();return;}
   S.me=st.me;S.uid=st.me.uid;S.role=st.me.role;S.isAdmin=st.me.role==='admin';
-  S.code=st.group.code;
+  S.code=st.group.code;S.orderMode=st.group.orderMode||'joined';
   S.settings=st.group.settings?cleanSettings(st.group.settings,today):null;
   S.membersAll=(st.members||[]).map(function(m){return L.cleanMember(m.uid,m);});
   S.payMap={};Object.keys(st.payments||{}).forEach(function(k){var p=st.payments[k];if(p.status==='paid')S.payMap[k]=p;});
@@ -280,7 +280,7 @@ Susu.change=change;
 Susu.saveSettings=function(draft){return change('PUT','/api/settings',draft);};
 Susu.toggleOpen=function(){return change('POST','/api/settings/open');};
 Susu.memberLink=async function(u,reset){try{return await api('GET','/api/members/'+encodeURIComponent(u)+'/link'+(reset?'?reset=1':''));}catch(e){return {error:e.message};}};
-Susu.shuffle=function(){return change('POST','/api/members/shuffle');};
+Susu.setOrder=function(mode,ids){return change('POST','/api/members/order',{mode:mode,ids:ids});};
 Susu.removeMember=function(u){return change('DELETE','/api/members/'+encodeURIComponent(u));};
 Susu.resetMemberPassword=async function(u,pw){try{await api('POST','/api/members/'+encodeURIComponent(u)+'/password',{password:pw});return '';}catch(e){return e.message;}};
 Susu.togglePaid=async function(r,u){

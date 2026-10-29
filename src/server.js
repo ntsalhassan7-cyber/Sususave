@@ -135,7 +135,7 @@ async function stateFor(me) {
   });
   return {
     me: { role: me.role, uid: String(me.id), name: me.name },
-    group: { code: c.g.code, settings: c.st },
+    group: { code: c.g.code, settings: c.st, orderMode: c.g.order_mode || 'joined' },
     members: c.members,
     payments: pays,
     payouts: outs,
@@ -275,15 +275,28 @@ app.get('/s/:token', wrap(async (req, res) => {
   res.redirect('/#home');
 }));
 
-/* Draw a random collection order. Allowed until the first pot has been handed over. */
-app.post('/api/members/shuffle', adminOnly, wrap(async (req, res) => {
+/* Collection order, three ways: joining order, a random draw, or the admin's own list.
+   Allowed until the first pot has been handed over. */
+app.post('/api/members/order', adminOnly, wrap(async (req, res) => {
   const paidOut = (await db.get("SELECT COUNT(*) AS n FROM payouts WHERE group_id=? AND status='paid'", [req.me.gid])).n;
   if (paidOut) return bad(res, 409, 'A pot has already been handed over, so the order is fixed now.');
-  const ids = (await db.all('SELECT id FROM members WHERE group_id=?', [req.me.gid])).map((m) => m.id);
-  if (ids.length < 2) return bad(res, 409, 'At least two people need to have joined before you can shuffle.');
-  for (let i = ids.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }
-  await db.batch(ids.map((id, i) => ['UPDATE members SET slot=? WHERE id=?', [i, id]]));
-  await log(req.me.gid, 'admin:' + req.me.name, 'members.shuffle', { order: ids });
+  const mode = String(req.body.mode || '');
+  const ids = (await db.all('SELECT id FROM members WHERE group_id=? ORDER BY joined_at, id', [req.me.gid])).map((m) => m.id);
+  let order;
+  if (mode === 'joined') order = null;
+  else if (mode === 'random') {
+    if (ids.length < 2) return bad(res, 409, 'At least two people need to have joined before you can draw.');
+    order = ids.slice();
+    for (let i = order.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [order[i], order[j]] = [order[j], order[i]]; }
+  } else if (mode === 'custom') {
+    order = (Array.isArray(req.body.ids) ? req.body.ids : []).map(Number);
+    const same = order.length === ids.length && ids.every((id) => order.indexOf(id) >= 0) && new Set(order).size === order.length;
+    if (!same) return bad(res, 400, 'The list must include every member once. Reload and try again.');
+  } else return bad(res, 400, 'Choose joining order, a random draw, or your own order.');
+  const writes = order ? order.map((id, i) => ['UPDATE members SET slot=? WHERE id=?', [i, id]]) : [['UPDATE members SET slot=NULL WHERE group_id=?', [req.me.gid]]];
+  writes.push(['UPDATE groups SET order_mode=? WHERE id=?', [mode, req.me.gid]]);
+  await db.batch(writes);
+  await log(req.me.gid, 'admin:' + req.me.name, 'members.order', { mode, order });
   await sendState(req, res);
 }));
 app.delete('/api/members/:id', adminOnly, wrap(async (req, res) => {
@@ -326,7 +339,7 @@ async function recordCash(me, c, rd, uid, on) {
 app.post('/api/payments/cash', signedIn, wrap(async (req, res) => {
   const c = await ctx(req.me.gid), rd = c.st && roundFor(c, req.body.r);
   if (!rd) return bad(res, 400, 'No such round.');
-  if (!mayRecord(req.me, c, rd)) return bad(res, 403, 'Only the admin or this round’s collector can record cash for it.');
+  if (!mayRecord(req.me, c, rd)) return bad(res, 403, 'Only the admin or this round\u2019s collector can record cash for it.');
   const on = req.body.on !== false;
   const err = await recordCash(req.me, c, rd, String(req.body.uid), on);
   if (err) return bad(res, 409, err);
@@ -336,7 +349,7 @@ app.post('/api/payments/cash', signedIn, wrap(async (req, res) => {
 app.post('/api/payments/all', signedIn, wrap(async (req, res) => {
   const c = await ctx(req.me.gid), rd = c.st && roundFor(c, req.body.r);
   if (!rd) return bad(res, 400, 'No such round.');
-  if (!mayRecord(req.me, c, rd)) return bad(res, 403, 'Only the admin or this round’s collector can record cash for it.');
+  if (!mayRecord(req.me, c, rd)) return bad(res, 403, 'Only the admin or this round\u2019s collector can record cash for it.');
   const on = req.body.on !== false;
   for (const i of rd.contributors) { const m = c.slots[i]; if (m) await recordCash(req.me, c, rd, m.uid, on); }
   await log(c.g.id, req.me.role + ':' + req.me.name, on ? 'cash.all_paid' : 'cash.all_cleared', { r: rd.r });

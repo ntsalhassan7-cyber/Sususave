@@ -173,3 +173,8 @@ details.more .q{margin-top:14px}
 .rank-v{font-weight:600;font-size:.9rem}
 .ad .card.hero{background:var(--grad);color:var(--hero-fg);border:0}
 .ad .card.hero .eyebrow,.ad .card.hero .scale,.ad .card.hero .hint{color:var(--hero-muted)}
+
+/* who receives first: the three choices */
+.order-pick{display:flex;flex-wrap:wrap;gap:8px}
+.order-pick .btn.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.order-save{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
