@@ -44,6 +44,12 @@ Vercel has no disk, so the database must live somewhere else. Turso is free and 
 
 ## Turning on mobile money (Paystack)
 
+To try it on your computer: copy `.env.example` to `.env`, put your **test** secret key in
+`PAYSTACK_SECRET_KEY=sk_test_...`, restart `npm start`. Members then see "Pay by MoMo"; on
+Paystack's test page use the test mobile money numbers from Paystack's docs (for example
+MTN 0551234987 with OTP 123456 for a successful payment). Nothing real is charged with test keys.
+
+
 1. Create a Paystack business at https://paystack.com (Ghana) and get your keys from
    Settings > API Keys & Webhooks. Test keys work with Paystack's test MoMo numbers.
 2. Add `PAYSTACK_SECRET_KEY` and `PAYSTACK_PUBLIC_KEY` to the Vercel environment variables and redeploy.

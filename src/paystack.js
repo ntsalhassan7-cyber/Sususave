@@ -4,19 +4,19 @@
    and https://paystack.com/docs/transfers/single-transfers/ */
 const crypto = require('crypto');
 
-const SECRET = process.env.PAYSTACK_SECRET_KEY || '';
-const PUBLIC = process.env.PAYSTACK_PUBLIC_KEY || '';
+const SECRET = () => process.env.PAYSTACK_SECRET_KEY || '';
+const PUBLIC = () => process.env.PAYSTACK_PUBLIC_KEY || '';
 const BASE = 'https://api.paystack.co';
 
 /* Paystack's bank codes for Ghanaian mobile money networks. */
 const PROVIDERS = { mtn: 'MTN', vodafone: 'VOD', airteltigo: 'ATL' };
 
-function enabled() { return !!SECRET; }
+function enabled() { return !!SECRET(); }
 
 async function call(method, path, body) {
   const res = await fetch(BASE + path, {
     method,
-    headers: { Authorization: 'Bearer ' + SECRET, 'Content-Type': 'application/json' },
+    headers: { Authorization: 'Bearer ' + SECRET(), 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined
   });
   const json = await res.json().catch(() => ({}));
@@ -58,8 +58,8 @@ async function transfer({ recipientCode, amount, reference, reason }) {
 
 /* Webhook check: Paystack signs the raw body with the secret key (HMAC SHA-512). */
 function validSignature(rawBody, signature) {
-  if (!SECRET || !signature) return false;
-  const h = crypto.createHmac('sha512', SECRET).update(rawBody).digest('hex');
+  if (!SECRET() || !signature) return false;
+  const h = crypto.createHmac('sha512', SECRET()).update(rawBody).digest('hex');
   return h.length === signature.length && crypto.timingSafeEqual(Buffer.from(h), Buffer.from(signature));
 }
 

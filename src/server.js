@@ -1,6 +1,7 @@
 /* Susu server: accounts, groups, the schedule, cash records and mobile money.
    Runs as a normal Node server (node src/server.js) and as a Vercel function (api/index.js). */
 'use strict';
+require('./env');
 const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
