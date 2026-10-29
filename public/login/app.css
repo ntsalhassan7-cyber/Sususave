@@ -54,3 +54,15 @@
 .note-card h3{font-family:var(--display);font-weight:600;font-size:1.05rem}
 .code-in{text-transform:uppercase;letter-spacing:.2em;font-family:var(--display);font-weight:700}
 .lg-found{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:.9rem}
+
+/* white side panel: green art on white, after the member app's cards */
+.lg-side{background:var(--surface);color:var(--fg);border-right:1px solid var(--line)}
+@media (max-width:860px){.lg-side{border-right:0;border-bottom:1px solid var(--line)}}
+.lg-logo{background:var(--forest);color:#fff}
+.jar .ln{stroke:var(--forest)}
+.jar .cn{fill:var(--surface2);stroke:var(--forest)}
+.lg-copy p{color:var(--muted)}
+.lg-side::before,.lg-side::after{border-color:var(--surface2)}
+.lg-side{isolation:isolate}
+.lg-side::before,.lg-side::after{z-index:0}
+.lg-side > *{z-index:1}
